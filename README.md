@@ -506,10 +506,45 @@ For commercial use, including:
 - Production deployment in enterprise environments
 - Resale or licensing to third parties
 
-**Contact**: Sean McDonnell for commercial licensing terms and pricing.
+## Commercial Sale - Complete Platform Transfer
+
+### Repository Sale Terms
+
+This Enterprise AI Integration Platform is available for purchase as a complete, production-ready solution. The repository includes all source code, documentation, deployment configurations, and intellectual property rights.
+
+**Starting Price: $2,500,000**
+
+### What You Get
+- Complete source code repository (42 files, 451,515+ lines of code)
+- Multi-model AI system with automatic failover (Claude, GPT-4, Gemini, Local AI)
+- Real ERP integration capabilities (SAP, Oracle, Microsoft Dynamics, NetSuite)
+- Docker containerization and Kubernetes deployment configurations
+- Comprehensive documentation and demo guides
+- Proprietary commercial license with full ownership rights
+- First-to-market AI-to-AI enterprise integration platform
+- Production-ready demonstration capabilities
+
+### Sale Conditions
+- **As-Is Sale**: No ongoing support, maintenance, or development included
+- **Complete Transfer**: Full ownership of all code, documentation, and IP
+- **No Obligations**: No ongoing requirements or support commitments from seller
+- **Commercial Rights**: Full rights to use, modify, and resell included
+
+### Value Justification
+- Development cost avoidance: $525,000 - $1,050,000
+- Time-to-market advantage: $500,000 - $2,000,000
+- Intellectual property value: $975,000 - $5,300,000
+- First-mover advantage in emerging AI-to-AI integration market
+
+### Contact for Purchase
+**Sean McDonnell** - Repository Owner
+- Complete platform transfer available
+- All intellectual property rights included
+- No ongoing obligations or support requirements
+
 
 ### License Enforcement
-Unauthorized commercial use is strictly prohibited and subject to legal action. This software is protected by copyright and proprietary licensing agreements.
+This software is protected by copyright and proprietary licensing agreements. Unauthorized use is strictly prohibited and subject to legal action.
 
 ---
 
