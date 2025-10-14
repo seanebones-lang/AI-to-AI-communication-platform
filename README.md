@@ -455,3 +455,29 @@ This demonstration platform is provided for educational and evaluation purposes.
 ---
 
 **Technical Contact**: For technical support or integration questions, refer to the API documentation and troubleshooting guide above.
+
+## Commercial Licensing
+
+**IMPORTANT**: This software is proprietary and confidential. The code in this repository is provided under a limited evaluation license only.
+
+### Commercial Use Restrictions
+- **Evaluation Only**: Code may be used for internal evaluation and testing
+- **No Commercial Use**: Commercial use requires separate written agreement
+- **No Redistribution**: May not be copied, modified, or distributed
+- **No Reverse Engineering**: May not be decompiled or reverse engineered
+
+### Commercial Licensing Available
+For commercial use, including:
+- Client demonstrations and presentations
+- Integration into commercial products
+- Production deployment in enterprise environments
+- Resale or licensing to third parties
+
+**Contact**: Sean McDonnell for commercial licensing terms and pricing.
+
+### License Enforcement
+Unauthorized commercial use is strictly prohibited and subject to legal action. This software is protected by copyright and proprietary licensing agreements.
+
+---
+
+**Copyright (c) 2025 Sean McDonnell. All rights reserved.**
