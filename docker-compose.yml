@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Main application
+  enterprise-ai:
+    build: .
+    ports:
+      - "8000:8000"
+      - "80:80"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LOCAL_AI_ENABLED=${LOCAL_AI_ENABLED:-false}
+      - LOCAL_AI_URL=${LOCAL_AI_URL:-http://localhost:11434}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/enterprise_ai
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./logs:/var/log
+    networks:
+      - enterprise-network
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - enterprise-network
+
+  # PostgreSQL for persistent storage
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=enterprise_ai
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - enterprise-network
+
+  # Optional: Local AI model server (Ollama)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - enterprise-network
+    profiles:
+      - local-ai
+
+  # Optional: Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - enterprise-network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - enterprise-network
+    profiles:
+      - monitoring
+
+volumes:
+  redis_data:
+  postgres_data:
+  ollama_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  enterprise-network:
+    driver: bridge
