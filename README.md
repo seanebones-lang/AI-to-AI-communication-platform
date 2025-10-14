@@ -456,6 +456,9 @@ This demonstration platform is provided for educational and evaluation purposes.
 
 **Technical Contact**: For technical support or integration questions, refer to the API documentation and troubleshooting guide above.
 
+
+**Copyright (c) 2025 Sean McDonnell. All rights reserved.**
+
 ## Commercial Licensing
 
 **IMPORTANT**: This software is proprietary and confidential. The code in this repository is provided under a limited evaluation license only.
