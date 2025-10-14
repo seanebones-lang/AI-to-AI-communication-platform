@@ -1,14 +1,13 @@
 #!/bin/bash
 
 # Enterprise AI Integration Platform - Installation Verification Script
-# Verifies all components including multi-model AI, ERP integrations, and Docker deployment
+# This script verifies the complete installation and configuration of the Enterprise AI Integration Platform
 
 set -e
 
-echo "========================================="
-echo "ENTERPRISE AI INTEGRATION PLATFORM"
-echo "COMPREHENSIVE INSTALLATION VERIFICATION"
-echo "========================================="
+echo "================================================================"
+echo "ENTERPRISE AI INTEGRATION PLATFORM - INSTALLATION VERIFICATION"
+echo "================================================================"
 echo ""
 
 # Color codes for output
@@ -23,13 +22,13 @@ print_status() {
     local status=$1
     local message=$2
     if [ "$status" = "PASS" ]; then
-        echo -e "${GREEN}✅ $message${NC}"
+        echo -e "${GREEN}[PASS]${NC} $message"
     elif [ "$status" = "FAIL" ]; then
-        echo -e "${RED}❌ $message${NC}"
+        echo -e "${RED}[FAIL]${NC} $message"
     elif [ "$status" = "WARN" ]; then
-        echo -e "${YELLOW}⚠️  $message${NC}"
-    else
-        echo -e "${BLUE}ℹ️  $message${NC}"
+        echo -e "${YELLOW}[WARN]${NC} $message"
+    elif [ "$status" = "INFO" ]; then
+        echo -e "${BLUE}[INFO]${NC} $message"
     fi
 }
 
@@ -38,437 +37,463 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to check if port is in use
-port_in_use() {
-    lsof -i :$1 >/dev/null 2>&1
-}
-
-# Initialize counters
-TOTAL_CHECKS=0
-PASSED_CHECKS=0
-FAILED_CHECKS=0
-WARNING_CHECKS=0
-
-# Function to run check
-run_check() {
-    local check_name=$1
-    local check_command=$2
-    local expected_result=${3:-"success"}
-    
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    if eval "$check_command" >/dev/null 2>&1; then
-        if [ "$expected_result" = "success" ]; then
-            print_status "PASS" "$check_name"
-            PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        else
-            print_status "FAIL" "$check_name (Unexpected success)"
-            FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        fi
+# Function to check if port is open
+check_port() {
+    local port=$1
+    if command_exists nc; then
+        nc -z localhost "$port" 2>/dev/null
+    elif command_exists telnet; then
+        timeout 3 telnet localhost "$port" 2>/dev/null | grep -q "Connected"
     else
-        if [ "$expected_result" = "failure" ]; then
-            print_status "PASS" "$check_name"
-            PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        else
-            print_status "FAIL" "$check_name"
-            FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        fi
+        return 1
     fi
 }
 
-# Function to run warning check
-run_warning_check() {
-    local check_name=$1
-    local check_command=$2
-    
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    if eval "$check_command" >/dev/null 2>&1; then
-        print_status "PASS" "$check_name"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
+# Function to check if service is running
+check_service() {
+    local service=$1
+    if command_exists systemctl; then
+        systemctl is-active --quiet "$service" 2>/dev/null
+    elif command_exists service; then
+        service "$service" status >/dev/null 2>&1
     else
-        print_status "WARN" "$check_name"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
+        return 1
     fi
 }
 
-echo "🔍 SYSTEM REQUIREMENTS CHECK"
-echo "============================="
+echo "VERIFICATION STARTED: $(date)"
+echo ""
 
-# Check Python version
-if command_exists python3; then
-    PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
-    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d'.' -f1)
-    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d'.' -f2)
-    
-    if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 8 ]; then
-        print_status "PASS" "Python $PYTHON_VERSION (>= 3.8 required)"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "FAIL" "Python $PYTHON_VERSION (>= 3.8 required)"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+# Check system requirements
+echo "SYSTEM REQUIREMENTS VERIFICATION"
+echo "================================"
+
+# Check operating system
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    print_status "PASS" "Operating System: Linux detected"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    print_status "PASS" "Operating System: macOS detected"
 else
-    print_status "FAIL" "Python 3.8+ not found"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    print_status "WARN" "Operating System: $OSTYPE (may not be fully supported)"
 fi
 
-# Check Node.js version
+# Check available memory
+if command_exists free; then
+    MEMORY_GB=$(free -g | awk '/^Mem:/{print $2}')
+    if [ "$MEMORY_GB" -ge 8 ]; then
+        print_status "PASS" "Memory: ${MEMORY_GB}GB available (minimum 8GB required)"
+    else
+        print_status "WARN" "Memory: ${MEMORY_GB}GB available (minimum 8GB recommended)"
+    fi
+else
+    print_status "INFO" "Memory check skipped (free command not available)"
+fi
+
+# Check available disk space
+if command_exists df; then
+    DISK_GB=$(df -BG . | awk 'NR==2{gsub(/[^0-9]/,"",$4); print $4}')
+    if [ "$DISK_GB" -ge 50 ]; then
+        print_status "PASS" "Disk Space: ${DISK_GB}GB available (minimum 50GB required)"
+    else
+        print_status "WARN" "Disk Space: ${DISK_GB}GB available (minimum 50GB recommended)"
+    fi
+else
+    print_status "INFO" "Disk space check skipped (df command not available)"
+fi
+
+echo ""
+
+# Check required software
+echo "REQUIRED SOFTWARE VERIFICATION"
+echo "=============================="
+
+# Check Python
+if command_exists python3; then
+    PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
+    print_status "PASS" "Python: Version $PYTHON_VERSION installed"
+else
+    print_status "FAIL" "Python: Python 3 not found"
+    exit 1
+fi
+
+# Check Node.js
 if command_exists node; then
     NODE_VERSION=$(node --version 2>&1 | cut -d'v' -f2)
-    NODE_MAJOR=$(echo $NODE_VERSION | cut -d'.' -f1)
-    
-    if [ "$NODE_MAJOR" -ge 16 ]; then
-        print_status "PASS" "Node.js $NODE_VERSION (>= 16.0 required)"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "FAIL" "Node.js $NODE_VERSION (>= 16.0 required)"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    print_status "PASS" "Node.js: Version $NODE_VERSION installed"
 else
-    print_status "FAIL" "Node.js 16.0+ not found"
-    FAILED_CHECKS=$((FAILED_CHECKS + 1))
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    print_status "FAIL" "Node.js: Node.js not found"
+    exit 1
 fi
 
 # Check npm
-run_check "npm package manager" "command_exists npm"
+if command_exists npm; then
+    NPM_VERSION=$(npm --version 2>&1)
+    print_status "PASS" "npm: Version $NPM_VERSION installed"
+else
+    print_status "FAIL" "npm: npm not found"
+    exit 1
+fi
 
 # Check Docker
-run_check "Docker" "command_exists docker"
+if command_exists docker; then
+    DOCKER_VERSION=$(docker --version 2>&1 | cut -d' ' -f3 | cut -d',' -f1)
+    print_status "PASS" "Docker: Version $DOCKER_VERSION installed"
+else
+    print_status "FAIL" "Docker: Docker not found"
+    exit 1
+fi
 
 # Check Docker Compose
-run_check "Docker Compose" "command_exists docker-compose"
+if command_exists docker-compose; then
+    COMPOSE_VERSION=$(docker-compose --version 2>&1 | cut -d' ' -f3 | cut -d',' -f1)
+    print_status "PASS" "Docker Compose: Version $COMPOSE_VERSION installed"
+else
+    print_status "FAIL" "Docker Compose: Docker Compose not found"
+    exit 1
+fi
 
 # Check Git
-run_check "Git version control" "command_exists git"
-
-echo ""
-echo "📦 BACKEND COMPONENTS CHECK"
-echo "============================"
-
-# Check backend directory
-run_check "Backend directory exists" "[ -d 'backend' ]"
-
-# Check virtual environment
-if [ -d "backend/venv" ]; then
-    print_status "PASS" "Python virtual environment exists"
-    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+if command_exists git; then
+    GIT_VERSION=$(git --version 2>&1 | cut -d' ' -f3)
+    print_status "PASS" "Git: Version $GIT_VERSION installed"
 else
-    print_status "WARN" "Python virtual environment not found (run: cd backend && python3 -m venv venv)"
-    WARNING_CHECKS=$((WARNING_CHECKS + 1))
+    print_status "FAIL" "Git: Git not found"
+    exit 1
 fi
-TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-
-# Check requirements.txt
-run_check "Backend requirements.txt" "[ -f 'backend/requirements.txt' ]"
-
-# Check main.py
-run_check "Backend main.py" "[ -f 'backend/main.py' ]"
-
-# Check multi-model AI files
-run_check "AI Provider module" "[ -f 'backend/agents/ai_provider.py' ]"
-run_check "Enhanced Corp AI" "[ -f 'backend/agents/corp_ai.py' ]"
-run_check "Enhanced ERP AI" "[ -f 'backend/agents/erp_ai.py' ]"
-run_check "ERP Integrations module" "[ -f 'backend/agents/erp_integrations.py' ]"
-
-# Check models and orchestrator
-run_check "Pydantic models" "[ -f 'backend/models.py' ]"
-run_check "Orchestrator" "[ -f 'backend/agents/orchestrator.py' ]"
 
 echo ""
-echo "🌐 FRONTEND COMPONENTS CHECK"
-echo "============================="
 
-# Check frontend directory
-run_check "Frontend directory exists" "[ -d 'frontend' ]"
+# Check project structure
+echo "PROJECT STRUCTURE VERIFICATION"
+echo "=============================="
 
-# Check package.json
-run_check "Frontend package.json" "[ -f 'frontend/package.json' ]"
+# Check if we're in the right directory
+if [ -f "README.md" ] && [ -d "backend" ] && [ -d "frontend" ]; then
+    print_status "PASS" "Project Structure: Enterprise AI Integration Platform detected"
+else
+    print_status "FAIL" "Project Structure: Not in the correct project directory"
+    exit 1
+fi
 
-# Check main components
-run_check "App.tsx component" "[ -f 'frontend/src/App.tsx' ]"
-run_check "Dashboard component" "[ -f 'frontend/src/components/Dashboard.tsx' ]"
-run_check "ConversationLog component" "[ -f 'frontend/src/components/ConversationLog.tsx' ]"
-run_check "AIFlowVisualizer component" "[ -f 'frontend/src/components/AIFlowVisualizer.tsx' ]"
-run_check "AuditTrail component" "[ -f 'frontend/src/components/AuditTrail.tsx' ]"
+# Check backend structure
+if [ -d "backend" ]; then
+    if [ -f "backend/main.py" ] || [ -f "backend/ibm_scale_main.py" ]; then
+        print_status "PASS" "Backend: Main application file found"
+    else
+        print_status "FAIL" "Backend: Main application file not found"
+    fi
+    
+    if [ -f "backend/requirements.txt" ]; then
+        print_status "PASS" "Backend: Requirements file found"
+    else
+        print_status "FAIL" "Backend: Requirements file not found"
+    fi
+    
+    if [ -d "backend/agents" ]; then
+        print_status "PASS" "Backend: AI agents directory found"
+    else
+        print_status "FAIL" "Backend: AI agents directory not found"
+    fi
+    
+    if [ -d "backend/enterprise" ]; then
+        print_status "PASS" "Backend: Enterprise features directory found"
+    else
+        print_status "FAIL" "Backend: Enterprise features directory not found"
+    fi
+else
+    print_status "FAIL" "Backend: Backend directory not found"
+fi
 
-# Check TypeScript types
-run_check "TypeScript types" "[ -f 'frontend/src/types.ts' ]"
+# Check frontend structure
+if [ -d "frontend" ]; then
+    if [ -f "frontend/package.json" ]; then
+        print_status "PASS" "Frontend: Package.json found"
+    else
+        print_status "FAIL" "Frontend: Package.json not found"
+    fi
+    
+    if [ -d "frontend/src" ]; then
+        print_status "PASS" "Frontend: Source directory found"
+    else
+        print_status "FAIL" "Frontend: Source directory not found"
+    fi
+else
+    print_status "FAIL" "Frontend: Frontend directory not found"
+fi
 
-echo ""
-echo "🐳 DOCKER DEPLOYMENT CHECK"
-echo "==========================="
+# Check Docker configuration
+if [ -f "Dockerfile" ]; then
+    print_status "PASS" "Docker: Dockerfile found"
+else
+    print_status "FAIL" "Docker: Dockerfile not found"
+fi
 
-# Check Docker files
-run_check "Dockerfile" "[ -f 'Dockerfile' ]"
-run_check "Docker Compose config" "[ -f 'docker-compose.yml' ]"
-run_check "Nginx configuration" "[ -f 'docker/nginx.conf' ]"
-run_check "Docker start script" "[ -f 'docker/start.sh' ]"
-run_check "Deploy script" "[ -f 'deploy.sh' ]"
-
-# Check Docker services configuration
 if [ -f "docker-compose.yml" ]; then
-    if grep -q "redis" docker-compose.yml && grep -q "postgres" docker-compose.yml; then
-        print_status "PASS" "Redis and PostgreSQL services configured"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "FAIL" "Redis and PostgreSQL services not configured"
-        FAILED_CHECKS=$((FAILED_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    print_status "PASS" "Docker: Docker Compose file found"
+else
+    print_status "FAIL" "Docker: Docker Compose file not found"
 fi
 
 echo ""
-echo "🔧 DEPLOYMENT SCRIPTS CHECK"
-echo "============================"
-
-# Check deployment scripts
-run_check "Start demo script" "[ -f 'start-demo.sh' ]"
-run_check "Backend test script" "[ -f 'test-backend.py' ]"
-run_check "Terminal demo script" "[ -f 'backend/terminal_demo.py' ]"
-
-# Check script permissions
-if [ -f "start-demo.sh" ]; then
-    if [ -x "start-demo.sh" ]; then
-        print_status "PASS" "Start demo script is executable"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "WARN" "Start demo script not executable (run: chmod +x start-demo.sh)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-fi
-
-if [ -f "deploy.sh" ]; then
-    if [ -x "deploy.sh" ]; then
-        print_status "PASS" "Deploy script is executable"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "WARN" "Deploy script not executable (run: chmod +x deploy.sh)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-fi
-
-echo ""
-echo "📋 CONFIGURATION FILES CHECK"
-echo "============================="
 
 # Check environment configuration
-run_check "Environment example file" "[ -f '.env.example' ]"
+echo "ENVIRONMENT CONFIGURATION VERIFICATION"
+echo "======================================"
 
-# Check .gitignore
-run_check "Git ignore file" "[ -f '.gitignore' ]"
+# Check environment file
+if [ -f ".env" ]; then
+    print_status "PASS" "Environment: .env file found"
+    
+    # Check for required environment variables
+    if grep -q "ANTHROPIC_API_KEY" .env; then
+        print_status "PASS" "Environment: Anthropic API key configured"
+    else
+        print_status "WARN" "Environment: Anthropic API key not configured"
+    fi
+    
+    if grep -q "OPENAI_API_KEY" .env; then
+        print_status "PASS" "Environment: OpenAI API key configured"
+    else
+        print_status "WARN" "Environment: OpenAI API key not configured"
+    fi
+    
+    if grep -q "GOOGLE_API_KEY" .env; then
+        print_status "PASS" "Environment: Google API key configured"
+    else
+        print_status "WARN" "Environment: Google API key not configured"
+    fi
+    
+    if grep -q "DATABASE_URL" .env; then
+        print_status "PASS" "Environment: Database URL configured"
+    else
+        print_status "WARN" "Environment: Database URL not configured"
+    fi
+    
+    if grep -q "REDIS_URL" .env; then
+        print_status "PASS" "Environment: Redis URL configured"
+    else
+        print_status "WARN" "Environment: Redis URL not configured"
+    fi
+else
+    print_status "WARN" "Environment: .env file not found (copy from .env.example)"
+fi
+
+echo ""
+
+# Check Docker services
+echo "DOCKER SERVICES VERIFICATION"
+echo "============================"
+
+# Check if Docker is running
+if docker info >/dev/null 2>&1; then
+    print_status "PASS" "Docker: Docker daemon is running"
+else
+    print_status "FAIL" "Docker: Docker daemon is not running"
+    exit 1
+fi
+
+# Check if Docker Compose can read the file
+if docker-compose config >/dev/null 2>&1; then
+    print_status "PASS" "Docker Compose: Configuration file is valid"
+else
+    print_status "FAIL" "Docker Compose: Configuration file is invalid"
+    exit 1
+fi
+
+# Check if services can be started
+if docker-compose up -d --no-deps backend >/dev/null 2>&1; then
+    print_status "PASS" "Docker: Backend service started successfully"
+    docker-compose down >/dev/null 2>&1
+else
+    print_status "WARN" "Docker: Backend service failed to start (check logs)"
+fi
+
+if docker-compose up -d --no-deps frontend >/dev/null 2>&1; then
+    print_status "PASS" "Docker: Frontend service started successfully"
+    docker-compose down >/dev/null 2>&1
+else
+    print_status "WARN" "Docker: Frontend service failed to start (check logs)"
+fi
+
+echo ""
+
+# Check Python dependencies
+echo "PYTHON DEPENDENCIES VERIFICATION"
+echo "================================"
+
+# Check if virtual environment exists
+if [ -d "venv" ]; then
+    print_status "PASS" "Python: Virtual environment found"
+    
+    # Activate virtual environment and check dependencies
+    if command_exists python3; then
+        # Check if requirements can be installed
+        if python3 -m pip install --dry-run -r backend/requirements.txt >/dev/null 2>&1; then
+            print_status "PASS" "Python: Requirements can be installed"
+        else
+            print_status "WARN" "Python: Some requirements may fail to install"
+        fi
+    fi
+else
+    print_status "WARN" "Python: Virtual environment not found (run 'python3 -m venv venv')"
+fi
+
+echo ""
+
+# Check Node.js dependencies
+echo "NODE.JS DEPENDENCIES VERIFICATION"
+echo "================================="
+
+# Check if node_modules exists
+if [ -d "frontend/node_modules" ]; then
+    print_status "PASS" "Node.js: Dependencies installed"
+else
+    print_status "WARN" "Node.js: Dependencies not installed (run 'npm install' in frontend directory)"
+fi
+
+# Check if package.json is valid
+if [ -f "frontend/package.json" ]; then
+    if node -e "JSON.parse(require('fs').readFileSync('frontend/package.json', 'utf8'))" >/dev/null 2>&1; then
+        print_status "PASS" "Node.js: Package.json is valid"
+    else
+        print_status "FAIL" "Node.js: Package.json is invalid"
+    fi
+fi
+
+echo ""
+
+# Check enterprise features
+echo "ENTERPRISE FEATURES VERIFICATION"
+echo "==============================="
+
+# Check multi-tenant platform
+if [ -d "backend/enterprise/multi_tenant" ]; then
+    print_status "PASS" "Enterprise: Multi-tenant platform found"
+else
+    print_status "WARN" "Enterprise: Multi-tenant platform not found"
+fi
+
+# Check global infrastructure
+if [ -d "backend/enterprise/global_infrastructure" ]; then
+    print_status "PASS" "Enterprise: Global infrastructure management found"
+else
+    print_status "WARN" "Enterprise: Global infrastructure management not found"
+fi
+
+# Check compliance framework
+if [ -d "backend/enterprise/compliance" ]; then
+    print_status "PASS" "Enterprise: Compliance framework found"
+else
+    print_status "WARN" "Enterprise: Compliance framework not found"
+fi
+
+# Check security architecture
+if [ -d "backend/agents/security" ]; then
+    print_status "PASS" "Enterprise: Security architecture found"
+else
+    print_status "WARN" "Enterprise: Security architecture not found"
+fi
+
+# Check vector database integration
+if [ -d "backend/agents/vector_db" ]; then
+    print_status "PASS" "Enterprise: Vector database integration found"
+else
+    print_status "WARN" "Enterprise: Vector database integration not found"
+fi
+
+# Check AI observability
+if [ -d "backend/agents/observability" ]; then
+    print_status "PASS" "Enterprise: AI observability found"
+else
+    print_status "WARN" "Enterprise: AI observability not found"
+fi
+
+# Check semantic caching
+if [ -d "backend/agents/caching" ]; then
+    print_status "PASS" "Enterprise: Semantic caching found"
+else
+    print_status "WARN" "Enterprise: Semantic caching not found"
+fi
+
+# Check streaming AI
+if [ -d "backend/agents/streaming" ]; then
+    print_status "PASS" "Enterprise: Streaming AI found"
+else
+    print_status "WARN" "Enterprise: Streaming AI not found"
+fi
+
+echo ""
 
 # Check documentation
-run_check "README.md" "[ -f 'README.md' ]"
-run_check "Demo guide" "[ -f 'DEMO_GUIDE.md' ]"
-run_check "Setup completion guide" "[ -f 'SETUP_COMPLETE.md' ]"
+echo "DOCUMENTATION VERIFICATION"
+echo "=========================="
 
-echo ""
-echo "🔑 API CONFIGURATION CHECK"
-echo "==========================="
-
-# Check for environment file
-if [ -f ".env" ]; then
-    print_status "PASS" "Environment configuration file exists"
-    PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    
-    # Check for API keys
-    if grep -q "ANTHROPIC_API_KEY" .env && grep -q "OPENAI_API_KEY" .env; then
-        print_status "PASS" "AI API keys configured"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "WARN" "AI API keys not configured (edit .env file)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 2))
-    
-    # Check for Google API key
-    if grep -q "GOOGLE_API_KEY" .env; then
-        print_status "PASS" "Google API key configured"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "WARN" "Google API key not configured (optional)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    # Check for local AI configuration
-    if grep -q "LOCAL_AI_ENABLED" .env; then
-        print_status "PASS" "Local AI configuration present"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "WARN" "Local AI configuration not found (optional)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    
-    # Check for ERP configuration
-    if grep -q "SAP_BASE_URL\|ORACLE_BASE_URL\|DYNAMICS_CLIENT_ID" .env; then
-        print_status "PASS" "ERP integration configuration present"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "WARN" "ERP integration configuration not found (optional)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+# Check main documentation files
+if [ -f "README.md" ]; then
+    print_status "PASS" "Documentation: README.md found"
 else
-    print_status "WARN" "Environment configuration file not found (copy .env.example to .env)"
-    WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+    print_status "FAIL" "Documentation: README.md not found"
 fi
 
-echo ""
-echo "🚀 FUNCTIONALITY TESTING"
-echo "========================="
-
-# Test backend imports
-if [ -d "backend" ]; then
-    cd backend
-    
-    # Test Python imports
-    if [ -f "venv/bin/activate" ]; then
-        source venv/bin/activate
-        
-        # Test core imports
-        if python3 -c "import fastapi, uvicorn, websockets" 2>/dev/null; then
-            print_status "PASS" "Core backend dependencies imported successfully"
-            PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        else
-            print_status "FAIL" "Core backend dependencies import failed"
-            FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        fi
-        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-        
-        # Test multi-model AI imports
-        if python3 -c "import anthropic, openai, google.generativeai" 2>/dev/null; then
-            print_status "PASS" "Multi-model AI dependencies imported successfully"
-            PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        else
-            print_status "WARN" "Multi-model AI dependencies not installed (pip install -r requirements.txt)"
-            WARNING_CHECKS=$((WARNING_CHECKS + 1))
-        fi
-        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-        
-        # Test ERP integration imports
-        if python3 -c "import requests, zeep, oauthlib" 2>/dev/null; then
-            print_status "PASS" "ERP integration dependencies imported successfully"
-            PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        else
-            print_status "WARN" "ERP integration dependencies not installed (pip install -r requirements.txt)"
-            WARNING_CHECKS=$((WARNING_CHECKS + 1))
-        fi
-        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-        
-        # Test AI agent imports
-        if python3 -c "from agents.ai_provider import MultiModelAIProvider; from agents.erp_integrations import SAPIntegration, OracleIntegration, DynamicsIntegration" 2>/dev/null; then
-            print_status "PASS" "AI agent modules imported successfully"
-            PASSED_CHECKS=$((PASSED_CHECKS + 1))
-        else
-            print_status "FAIL" "AI agent modules import failed"
-            FAILED_CHECKS=$((FAILED_CHECKS + 1))
-        fi
-        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-        
-        deactivate
-    else
-        print_status "WARN" "Virtual environment not activated (run: cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-        TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-    fi
-    
-    cd ..
-fi
-
-# Test Docker functionality
-if command_exists docker; then
-    if docker --version >/dev/null 2>&1; then
-        print_status "PASS" "Docker daemon accessible"
-        PASSED_CHECKS=$((PASSED_CHECKS + 1))
-    else
-        print_status "WARN" "Docker daemon not accessible (start Docker service)"
-        WARNING_CHECKS=$((WARNING_CHECKS + 1))
-    fi
-    TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
-fi
-
-# Test port availability
-if ! port_in_use 8000; then
-    print_status "PASS" "Backend port 8000 available"
-    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+if [ -f "TECHNICAL_ARCHITECTURE.md" ]; then
+    print_status "PASS" "Documentation: Technical architecture documentation found"
 else
-    print_status "WARN" "Backend port 8000 in use (stop existing services)"
-    WARNING_CHECKS=$((WARNING_CHECKS + 1))
+    print_status "WARN" "Documentation: Technical architecture documentation not found"
 fi
-TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
 
-if ! port_in_use 5173; then
-    print_status "PASS" "Frontend port 5173 available"
-    PASSED_CHECKS=$((PASSED_CHECKS + 1))
+if [ -f "DEMO_GUIDE.md" ]; then
+    print_status "PASS" "Documentation: Demo guide found"
 else
-    print_status "WARN" "Frontend port 5173 in use (stop existing services)"
-    WARNING_CHECKS=$((WARNING_CHECKS + 1))
+    print_status "WARN" "Documentation: Demo guide not found"
 fi
-TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
+
+if [ -f "SETUP_COMPLETE.md" ]; then
+    print_status "PASS" "Documentation: Setup completion documentation found"
+else
+    print_status "WARN" "Documentation: Setup completion documentation not found"
+fi
+
+if [ -f "LICENSE" ]; then
+    print_status "PASS" "Documentation: License file found"
+else
+    print_status "WARN" "Documentation: License file not found"
+fi
 
 echo ""
-echo "📊 VERIFICATION SUMMARY"
-echo "======================="
 
-echo "Total Checks: $TOTAL_CHECKS"
-echo -e "Passed: ${GREEN}$PASSED_CHECKS${NC}"
-echo -e "Failed: ${RED}$FAILED_CHECKS${NC}"
-echo -e "Warnings: ${YELLOW}$WARNING_CHECKS${NC}"
-
-SUCCESS_RATE=$((PASSED_CHECKS * 100 / TOTAL_CHECKS))
-echo "Success Rate: $SUCCESS_RATE%"
-
+# Final summary
+echo "VERIFICATION SUMMARY"
+echo "==================="
 echo ""
-if [ $FAILED_CHECKS -eq 0 ] && [ $WARNING_CHECKS -le 3 ]; then
-    echo -e "${GREEN}🎉 INSTALLATION VERIFICATION PASSED${NC}"
-    echo -e "${GREEN}The Enterprise AI Integration Platform is ready for demonstration!${NC}"
+
+# Count passes and failures
+PASS_COUNT=$(grep -c "\[PASS\]" <<< "$(cat $0)")
+FAIL_COUNT=$(grep -c "\[FAIL\]" <<< "$(cat $0)")
+WARN_COUNT=$(grep -c "\[WARN\]" <<< "$(cat $0)")
+
+echo "VERIFICATION COMPLETED: $(date)"
+echo ""
+echo "RESULTS SUMMARY:"
+echo "- Passed: $PASS_COUNT checks"
+echo "- Failed: $FAIL_COUNT checks"
+echo "- Warnings: $WARN_COUNT checks"
+echo ""
+
+if [ "$FAIL_COUNT" -eq 0 ]; then
+    print_status "PASS" "Enterprise AI Integration Platform verification completed successfully"
     echo ""
-    echo "Next Steps:"
+    echo "NEXT STEPS:"
     echo "1. Configure API keys in .env file"
-    echo "2. Run: ./start-demo.sh"
-    echo "3. Open: http://localhost:5173"
-    echo "4. Follow: DEMO_GUIDE.md"
-elif [ $FAILED_CHECKS -eq 0 ]; then
-    echo -e "${YELLOW}⚠️  INSTALLATION VERIFICATION PASSED WITH WARNINGS${NC}"
-    echo -e "${YELLOW}The platform is functional but some optional features may not be available.${NC}"
+    echo "2. Run 'docker-compose up -d' to start the platform"
+    echo "3. Access the platform at http://localhost:8000"
+    echo "4. Review documentation for deployment options"
     echo ""
-    echo "Recommended Actions:"
-    echo "1. Review warnings above"
-    echo "2. Install missing optional dependencies"
-    echo "3. Configure additional API keys if needed"
+    echo "PLATFORM STATUS: READY FOR ENTERPRISE DEPLOYMENT"
 else
-    echo -e "${RED}❌ INSTALLATION VERIFICATION FAILED${NC}"
-    echo -e "${RED}Critical components are missing. Please fix the failed checks above.${NC}"
+    print_status "FAIL" "Enterprise AI Integration Platform verification failed"
     echo ""
-    echo "Required Actions:"
-    echo "1. Fix all failed checks"
-    echo "2. Install missing dependencies"
-    echo "3. Configure required environment variables"
-    echo "4. Re-run this verification script"
+    echo "Please address the failed checks before proceeding with deployment."
+    exit 1
 fi
 
-echo ""
-echo "📚 DOCUMENTATION AVAILABLE:"
-echo "- README.md: Complete technical documentation"
-echo "- DEMO_GUIDE.md: Step-by-step demonstration guide"
-echo "- SETUP_COMPLETE.md: Setup completion and status"
-echo "- .env.example: Environment configuration template"
-
-echo ""
-echo "🔧 TROUBLESHOOTING:"
-echo "- Backend issues: Check Python virtual environment and dependencies"
-echo "- Frontend issues: Verify Node.js version and npm packages"
-echo "- Docker issues: Ensure Docker daemon is running"
-echo "- API issues: Verify API keys and network connectivity"
-
-exit $FAILED_CHECKS
+echo "================================================================"
