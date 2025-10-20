@@ -1,3 +1,16 @@
+# ⚠️ PROPRIETARY SOFTWARE NOTICE
+
+**This is proprietary software owned by Sean McDonnell. All rights reserved.**
+
+- 🚫 **NOT open source**
+- 🚫 **NOT free software** 
+- ✅ **Evaluation permitted**
+- 🔒 **Commercial use requires license**
+
+For licensing inquiries: [www.bizbot.store](https://www.bizbot.store)
+
+---
+
 # Enterprise AI Integration Platform
 
 ## Executive Summary
