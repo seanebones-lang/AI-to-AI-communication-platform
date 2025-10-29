@@ -1,0 +1,2 @@
+"""Multi-tenant architecture package"""
+
